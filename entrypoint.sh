@@ -34,4 +34,4 @@ fi
 export HOME="/home/node"
 export OPENCLAW_HOME="$OPENCLAW_HOME"
 echo "Starting OpenClaw gateway..."
-exec gosu node openclaw gateway --allow-unconfigured
+exec gosu node openclaw gateway --allow-unconfigured --bind lan --port "${PORT:-18789}"
