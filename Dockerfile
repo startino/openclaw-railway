@@ -7,7 +7,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN npm install -g openclaw
 
-VOLUME /data
 EXPOSE 18789
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
