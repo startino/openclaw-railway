@@ -6,7 +6,11 @@ TS_STATE="/data/tailscale"
 
 # Create dirs and fix Railway volume permissions (runs as root)
 mkdir -p "$OPENCLAW_HOME" "$TS_STATE"
-chown -R node:node /data
+chown node:node /data "$OPENCLAW_HOME" "$TS_STATE"
+# Fix ownership on openclaw config dir only (not entire volume - too slow on large volumes)
+if [ -d "$OPENCLAW_HOME/.openclaw" ]; then
+    chown -R node:node "$OPENCLAW_HOME/.openclaw"
+fi
 
 # Start Tailscale if auth key is provided
 if [ -n "${TS_AUTHKEY:-}" ]; then
