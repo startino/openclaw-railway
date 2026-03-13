@@ -34,21 +34,37 @@ else
     echo "TS_AUTHKEY not set, skipping Tailscale."
 fi
 
-# Write minimal config if none exists (needed for non-loopback binding)
+# Patch config for Railway compatibility on every boot
 CONFIG_FILE="$OPENCLAW_HOME/.openclaw/openclaw.json"
-if [ ! -f "$CONFIG_FILE" ]; then
-    mkdir -p "$OPENCLAW_HOME/.openclaw"
+mkdir -p "$OPENCLAW_HOME/.openclaw"
+if [ -f "$CONFIG_FILE" ]; then
+    # Remove gateway.tailscale (conflicts with bind:lan), ensure bind is lan
+    node -e "
+      const fs = require('fs');
+      const c = JSON.parse(fs.readFileSync('$CONFIG_FILE','utf8'));
+      if (c.gateway) {
+        delete c.gateway.tailscale;
+        c.gateway.bind = 'lan';
+        if (!c.gateway.controlUi) c.gateway.controlUi = {};
+        c.gateway.controlUi.dangerouslyAllowHostHeaderOriginFallback = true;
+      }
+      fs.writeFileSync('$CONFIG_FILE', JSON.stringify(c, null, 2));
+    "
+    echo "Config patched for Railway."
+else
     cat > "$CONFIG_FILE" << 'CONF'
 {
   "gateway": {
+    "bind": "lan",
     "controlUi": {
       "dangerouslyAllowHostHeaderOriginFallback": true
     }
   }
 }
 CONF
-    chown node:node "$CONFIG_FILE"
+    echo "Default config written."
 fi
+chown node:node "$CONFIG_FILE"
 
 # Drop to node user, start OpenClaw gateway (becomes PID 1)
 export HOME="/home/node"
