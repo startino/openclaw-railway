@@ -30,6 +30,22 @@ else
     echo "TS_AUTHKEY not set, skipping Tailscale."
 fi
 
+# Write minimal config if none exists (needed for non-loopback binding)
+CONFIG_FILE="$OPENCLAW_HOME/.openclaw/openclaw.json"
+if [ ! -f "$CONFIG_FILE" ]; then
+    mkdir -p "$OPENCLAW_HOME/.openclaw"
+    cat > "$CONFIG_FILE" << 'CONF'
+{
+  "gateway": {
+    "controlUi": {
+      "dangerouslyAllowHostHeaderOriginFallback": true
+    }
+  }
+}
+CONF
+    chown node:node "$CONFIG_FILE"
+fi
+
 # Drop to node user, start OpenClaw gateway (becomes PID 1)
 export HOME="/home/node"
 export OPENCLAW_HOME="$OPENCLAW_HOME"
