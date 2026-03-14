@@ -47,6 +47,9 @@ if [ -f "$CONFIG_FILE" ]; then
         c.gateway.bind = 'lan';
         if (!c.gateway.controlUi) c.gateway.controlUi = {};
         c.gateway.controlUi.dangerouslyAllowHostHeaderOriginFallback = true;
+        // Allow local.openclaw.zone origin through Caddy reverse proxy
+        const origins = process.env.OPENCLAW_ALLOWED_ORIGINS;
+        if (origins) c.gateway.controlUi.allowedOrigins = origins.split(',').map(s => s.trim());
         // Sync auth token from env var if set
         const envToken = process.env.OPENCLAW_GATEWAY_TOKEN;
         if (envToken && c.gateway.auth) c.gateway.auth.token = envToken;
@@ -55,16 +58,18 @@ if [ -f "$CONFIG_FILE" ]; then
     "
     echo "Config patched for Railway."
 else
-    cat > "$CONFIG_FILE" << 'CONF'
-{
-  "gateway": {
-    "bind": "lan",
-    "controlUi": {
-      "dangerouslyAllowHostHeaderOriginFallback": true
-    }
-  }
-}
-CONF
+    # Build default config with allowed origins from env
+    node -e "
+      const cfg = {
+        gateway: {
+          bind: 'lan',
+          controlUi: { dangerouslyAllowHostHeaderOriginFallback: true }
+        }
+      };
+      const origins = process.env.OPENCLAW_ALLOWED_ORIGINS;
+      if (origins) cfg.gateway.controlUi.allowedOrigins = origins.split(',').map(s => s.trim());
+      require('fs').writeFileSync('$CONFIG_FILE', JSON.stringify(cfg, null, 2));
+    "
     echo "Default config written."
 fi
 chown node:node "$CONFIG_FILE"
