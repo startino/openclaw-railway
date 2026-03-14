@@ -34,6 +34,15 @@ else
     echo "TS_AUTHKEY not set, skipping Tailscale."
 fi
 
+# Migrate old openclaw data if it exists at /data/.openclaw (old OPENCLAW_HOME=/data)
+if [ -d "/data/.openclaw" ] && [ ! -f "$OPENCLAW_HOME/.openclaw/.migrated" ]; then
+    echo "Migrating old .openclaw data to new location..."
+    cp -a /data/.openclaw/. "$OPENCLAW_HOME/.openclaw/"
+    touch "$OPENCLAW_HOME/.openclaw/.migrated"
+    chown -R node:node "$OPENCLAW_HOME/.openclaw"
+    echo "Migration complete."
+fi
+
 # Patch config for Railway compatibility on every boot
 CONFIG_FILE="$OPENCLAW_HOME/.openclaw/openclaw.json"
 mkdir -p "$OPENCLAW_HOME/.openclaw"
