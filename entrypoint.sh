@@ -47,6 +47,8 @@ if [ -f "$CONFIG_FILE" ]; then
         c.gateway.bind = 'lan';
         if (!c.gateway.controlUi) c.gateway.controlUi = {};
         c.gateway.controlUi.dangerouslyAllowHostHeaderOriginFallback = true;
+        // Skip device pairing for remote Control UI (token auth is still required)
+        c.gateway.controlUi.dangerouslyDisableDeviceAuth = true;
         // Allow local.openclaw.zone origin through Caddy reverse proxy
         const origins = process.env.OPENCLAW_ALLOWED_ORIGINS;
         if (origins) c.gateway.controlUi.allowedOrigins = origins.split(',').map(s => s.trim());
@@ -63,7 +65,7 @@ else
       const cfg = {
         gateway: {
           bind: 'lan',
-          controlUi: { dangerouslyAllowHostHeaderOriginFallback: true }
+          controlUi: { dangerouslyAllowHostHeaderOriginFallback: true, dangerouslyDisableDeviceAuth: true }
         }
       };
       const origins = process.env.OPENCLAW_ALLOWED_ORIGINS;
