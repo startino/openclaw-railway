@@ -47,6 +47,9 @@ if [ -f "$CONFIG_FILE" ]; then
         c.gateway.bind = 'lan';
         if (!c.gateway.controlUi) c.gateway.controlUi = {};
         c.gateway.controlUi.dangerouslyAllowHostHeaderOriginFallback = true;
+        // Sync auth token from env var if set
+        const envToken = process.env.OPENCLAW_GATEWAY_TOKEN;
+        if (envToken && c.gateway.auth) c.gateway.auth.token = envToken;
       }
       fs.writeFileSync('$CONFIG_FILE', JSON.stringify(c, null, 2));
     "
