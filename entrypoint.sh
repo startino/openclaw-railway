@@ -3,11 +3,11 @@ set -e
 
 OPENCLAW_HOME="/data/openclaw"
 TS_STATE="/data/tailscale"
+CONFIG_DIR="/opt/openclaw-config"
 
 # Create dirs and fix Railway volume permissions (runs as root)
-mkdir -p "$OPENCLAW_HOME" "$TS_STATE"
+mkdir -p "$OPENCLAW_HOME/.openclaw" "$TS_STATE"
 chown node:node /data "$OPENCLAW_HOME" "$TS_STATE"
-# Fix ownership on openclaw config dir only (not entire volume - too slow on large volumes)
 if [ -d "$OPENCLAW_HOME/.openclaw" ]; then
     chown -R node:node "$OPENCLAW_HOME/.openclaw"
 fi
@@ -17,13 +17,11 @@ if [ -n "${TS_AUTHKEY:-}" ]; then
     echo "Starting Tailscale..."
     tailscaled --state="$TS_STATE/tailscaled.state" --tun=userspace-networking --port=41641 &
 
-    # Wait for tailscaled socket
     for i in $(seq 1 10); do
         if tailscale status --json >/dev/null 2>&1; then break; fi
         sleep 1
     done
 
-    # Bring up Tailscale subnet router
     tailscale up \
         --authkey="${TS_AUTHKEY}" \
         --hostname="${TS_HOSTNAME:-openclaw}" \
@@ -34,56 +32,35 @@ else
     echo "TS_AUTHKEY not set, skipping Tailscale."
 fi
 
-# Migrate old openclaw data if it exists at /data/.openclaw (old OPENCLAW_HOME=/data)
-if [ -d "/data/.openclaw" ] && [ ! -f "$OPENCLAW_HOME/.openclaw/.migrated" ]; then
-    echo "Migrating old .openclaw data to new location..."
-    cp -a /data/.openclaw/. "$OPENCLAW_HOME/.openclaw/"
-    touch "$OPENCLAW_HOME/.openclaw/.migrated"
-    chown -R node:node "$OPENCLAW_HOME/.openclaw"
-    echo "Migration complete."
+# Seed config from template if none exists, then patch env-var-driven values
+CONFIG_FILE="$OPENCLAW_HOME/.openclaw/openclaw.json"
+if [ ! -f "$CONFIG_FILE" ]; then
+    cp "$CONFIG_DIR/openclaw.json" "$CONFIG_FILE"
+    echo "Config seeded from template."
 fi
 
-# Patch config for Railway compatibility on every boot
-CONFIG_FILE="$OPENCLAW_HOME/.openclaw/openclaw.json"
-mkdir -p "$OPENCLAW_HOME/.openclaw"
-if [ -f "$CONFIG_FILE" ]; then
-    # Remove gateway.tailscale (conflicts with bind:lan), ensure bind is lan
-    node -e "
-      const fs = require('fs');
-      const c = JSON.parse(fs.readFileSync('$CONFIG_FILE','utf8'));
-      if (c.gateway) {
-        delete c.gateway.tailscale;
-        c.gateway.bind = 'lan';
-        if (!c.gateway.controlUi) c.gateway.controlUi = {};
-        c.gateway.controlUi.dangerouslyAllowHostHeaderOriginFallback = true;
-        // Skip device pairing for remote Control UI (token auth is still required)
-        c.gateway.controlUi.dangerouslyDisableDeviceAuth = true;
-        // Allow local.openclaw.zone origin through Caddy reverse proxy
-        const origins = process.env.OPENCLAW_ALLOWED_ORIGINS;
-        if (origins) c.gateway.controlUi.allowedOrigins = origins.split(',').map(s => s.trim());
-        // Sync auth token from env var if set
-        const envToken = process.env.OPENCLAW_GATEWAY_TOKEN;
-        if (envToken && c.gateway.auth) c.gateway.auth.token = envToken;
-      }
-      fs.writeFileSync('$CONFIG_FILE', JSON.stringify(c, null, 2));
-    "
-    echo "Config patched for Railway."
-else
-    # Build default config with allowed origins from env
-    node -e "
-      const cfg = {
-        gateway: {
-          bind: 'lan',
-          controlUi: { dangerouslyAllowHostHeaderOriginFallback: true, dangerouslyDisableDeviceAuth: true }
-        }
-      };
-      const origins = process.env.OPENCLAW_ALLOWED_ORIGINS;
-      if (origins) cfg.gateway.controlUi.allowedOrigins = origins.split(',').map(s => s.trim());
-      require('fs').writeFileSync('$CONFIG_FILE', JSON.stringify(cfg, null, 2));
-    "
-    echo "Default config written."
-fi
+# Patch runtime values (token, allowed origins) into config
+node -e "
+  const fs = require('fs');
+  const c = JSON.parse(fs.readFileSync('$CONFIG_FILE', 'utf8'));
+
+  // Ensure gateway structure
+  if (!c.gateway) c.gateway = {};
+  if (!c.gateway.auth) c.gateway.auth = { mode: 'token' };
+  if (!c.gateway.controlUi) c.gateway.controlUi = {};
+
+  // Sync auth token
+  const token = process.env.OPENCLAW_GATEWAY_TOKEN;
+  if (token) c.gateway.auth.token = token;
+
+  // Sync allowed origins
+  const origins = process.env.OPENCLAW_ALLOWED_ORIGINS;
+  if (origins) c.gateway.controlUi.allowedOrigins = origins.split(',').map(s => s.trim());
+
+  fs.writeFileSync('$CONFIG_FILE', JSON.stringify(c, null, 2));
+"
 chown node:node "$CONFIG_FILE"
+echo "Config ready."
 
 # Configure git auth if GitHub token is provided
 if [ -n "${GITHUB_TOKEN:-}" ]; then
@@ -91,6 +68,24 @@ if [ -n "${GITHUB_TOKEN:-}" ]; then
     chown node:node /home/node/.netrc
     chmod 600 /home/node/.netrc
     echo "Git auth configured."
+fi
+
+# Initialize workspace git repo if token is set and workspace exists
+WORKSPACE="$OPENCLAW_HOME/.openclaw/workspace"
+if [ -n "${GITHUB_TOKEN:-}" ] && [ -d "$WORKSPACE" ] && [ ! -d "$WORKSPACE/.git" ]; then
+    REPO="${WORKSPACE_REPO:-https://github.com/startino/openclaw-workspace.git}"
+    echo "Initializing workspace git repo..."
+    cd "$WORKSPACE"
+    gosu node git init
+    gosu node git remote add origin "$REPO"
+    cd /
+    echo "Workspace git initialized (remote: $REPO)."
+fi
+
+# Copy workspace .gitignore if not present
+if [ -d "$WORKSPACE" ] && [ ! -f "$WORKSPACE/.gitignore" ]; then
+    cp "$CONFIG_DIR/workspace.gitignore" "$WORKSPACE/.gitignore"
+    chown node:node "$WORKSPACE/.gitignore"
 fi
 
 # Drop to node user, start OpenClaw gateway (becomes PID 1)

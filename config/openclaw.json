@@ -1,0 +1,32 @@
+{
+  "gateway": {
+    "port": 18789,
+    "bind": "lan",
+    "auth": {
+      "mode": "token"
+    },
+    "controlUi": {
+      "enabled": true,
+      "dangerouslyAllowHostHeaderOriginFallback": true,
+      "dangerouslyDisableDeviceAuth": true
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "anthropic/claude-sonnet-4-5"
+      },
+      "workspace": "/data/openclaw/.openclaw/workspace",
+      "maxConcurrent": 4
+    },
+    "list": [
+      { "id": "main", "default": true }
+    ]
+  },
+  "tools": {
+    "web": {
+      "search": { "enabled": true },
+      "fetch": { "enabled": true }
+    }
+  }
+}

@@ -13,4 +13,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
     CMD curl -f http://localhost:18789/healthz || exit 1
 
 COPY --chmod=755 entrypoint.sh /entrypoint.sh
+COPY config/ /opt/openclaw-config/
+COPY --chmod=755 scripts/ /opt/openclaw-scripts/
+
 ENTRYPOINT ["/entrypoint.sh"]
