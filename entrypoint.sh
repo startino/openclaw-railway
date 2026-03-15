@@ -85,6 +85,18 @@ else
 fi
 chown node:node "$CONFIG_FILE"
 
+# Network diagnostic
+echo "=== Network diagnostic ==="
+echo "DNS:" && cat /etc/resolv.conf
+echo "Outbound test (discord):" && curl -s -o /dev/null -w "%{http_code} %{time_total}s" --max-time 5 https://discord.com/api/v10/gateway 2>&1 || echo "FAILED"
+echo ""
+echo "Outbound test (whatsapp):" && curl -s -o /dev/null -w "%{http_code} %{time_total}s" --max-time 5 https://web.whatsapp.com 2>&1 || echo "FAILED"
+echo ""
+echo "Outbound test (google):" && curl -s -o /dev/null -w "%{http_code} %{time_total}s" --max-time 5 https://www.google.com 2>&1 || echo "FAILED"
+echo ""
+echo "Route table:" && ip route 2>/dev/null || echo "ip not available"
+echo "=== End diagnostic ==="
+
 # Drop to node user, start OpenClaw gateway (becomes PID 1)
 export HOME="/home/node"
 export OPENCLAW_HOME="$OPENCLAW_HOME"
