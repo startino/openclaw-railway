@@ -1,7 +1,8 @@
 FROM node:22-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl git gosu && \
+    ca-certificates curl git gosu \
+    jq procps lsof nano less htop && \
     curl -fsSL https://tailscale.com/install.sh | sh && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
