@@ -62,12 +62,15 @@ node -e "
 chown node:node "$CONFIG_FILE"
 echo "Config ready."
 
-# Configure git auth if GitHub token is provided
+# Configure git auth for both root and node users
 if [ -n "${GITHUB_TOKEN:-}" ]; then
-    echo "machine github.com login x-access-token password ${GITHUB_TOKEN}" > /home/node/.netrc
+    NETRC_LINE="machine github.com login x-access-token password ${GITHUB_TOKEN}"
+    echo "$NETRC_LINE" > /home/node/.netrc
     chown node:node /home/node/.netrc
     chmod 600 /home/node/.netrc
-    echo "Git auth configured."
+    echo "$NETRC_LINE" > /root/.netrc
+    chmod 600 /root/.netrc
+    echo "Git auth configured (root + node)."
 fi
 
 # Initialize workspace git repo if token is set and workspace exists
