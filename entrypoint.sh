@@ -26,7 +26,8 @@ if [ -n "${TS_AUTHKEY:-}" ]; then
         --authkey="${TS_AUTHKEY}" \
         --hostname="${TS_HOSTNAME:-openclaw}" \
         --advertise-routes="${TS_ROUTES:-fd12::/16}" \
-        --accept-dns=false
+        --accept-dns=false \
+        --reset
     echo "Tailscale connected."
 else
     echo "TS_AUTHKEY not set, skipping Tailscale."
