@@ -57,6 +57,9 @@ node -e "
   const origins = process.env.OPENCLAW_ALLOWED_ORIGINS;
   if (origins) c.gateway.controlUi.allowedOrigins = origins.split(',').map(s => s.trim());
 
+  // Sanitize: remove keys that cause schema validation failures
+  if (c.cron && c.cron.jobs) delete c.cron.jobs;
+
   fs.writeFileSync('$CONFIG_FILE', JSON.stringify(c, null, 2));
 "
 chown node:node "$CONFIG_FILE"
