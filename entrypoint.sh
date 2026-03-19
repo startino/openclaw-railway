@@ -60,6 +60,8 @@ node -e "
 
   // Sanitize: remove keys that cause schema validation failures
   if (c.cron && c.cron.jobs) delete c.cron.jobs;
+  // Ensure cron is properly enabled (not just empty object)
+  if (c.cron && !c.cron.enabled) c.cron.enabled = true;
 
   fs.writeFileSync('$CONFIG_FILE', JSON.stringify(c, null, 2));
 "
@@ -95,8 +97,33 @@ if [ -d "$WORKSPACE" ] && [ ! -f "$WORKSPACE/.gitignore" ]; then
     chown node:node "$WORKSPACE/.gitignore"
 fi
 
-# Drop to node user, start OpenClaw gateway (becomes PID 1)
+# Drop to node user, start OpenClaw gateway
 export HOME="/home/node"
 export OPENCLAW_HOME="$OPENCLAW_HOME"
+GW_PORT="${PORT:-18789}"
+
+# Start gateway in background for auto-pairing
 echo "Starting OpenClaw gateway..."
-exec gosu node openclaw gateway --allow-unconfigured --bind lan --port "${PORT:-18789}"
+gosu node openclaw gateway --allow-unconfigured --bind lan --port "$GW_PORT" &
+GW_PID=$!
+
+# Auto-pair the local CLI with the gateway (headless bootstrap)
+echo "Waiting for gateway to accept connections..."
+for i in $(seq 1 30); do
+    if curl -sf http://127.0.0.1:$GW_PORT/healthz >/dev/null 2>&1; then
+        echo "Gateway ready, auto-pairing CLI..."
+        # Trigger a pairing request from node user, then approve it
+        gosu node openclaw devices list 2>/dev/null &
+        PAIR_PID=$!
+        sleep 2
+        # Approve the latest pending request
+        OPENCLAW_GATEWAY_TOKEN="${OPENCLAW_GATEWAY_TOKEN}" gosu node openclaw devices approve --latest 2>/dev/null && echo "CLI auto-paired." || echo "Auto-pair skipped (already paired or no pending request)."
+        kill $PAIR_PID 2>/dev/null || true
+        wait $PAIR_PID 2>/dev/null || true
+        break
+    fi
+    sleep 1
+done
+
+# Wait on gateway process (it's now PID 1's child)
+wait $GW_PID
