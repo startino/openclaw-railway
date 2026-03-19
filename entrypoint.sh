@@ -47,12 +47,10 @@ node -e "
 
   // Ensure gateway structure
   if (!c.gateway) c.gateway = {};
-  if (!c.gateway.auth) c.gateway.auth = { mode: 'token' };
   if (!c.gateway.controlUi) c.gateway.controlUi = {};
 
-  // Sync auth token
-  const token = process.env.OPENCLAW_GATEWAY_TOKEN;
-  if (token) c.gateway.auth.token = token;
+  // Auth: none (Tailscale is the security boundary)
+  c.gateway.auth = { mode: 'none' };
 
   // Sync allowed origins
   const origins = process.env.OPENCLAW_ALLOWED_ORIGINS;
@@ -100,24 +98,6 @@ fi
 # Drop to node user, start OpenClaw gateway
 export HOME="/home/node"
 export OPENCLAW_HOME="$OPENCLAW_HOME"
-
-# Write CLI auth config so exec'd openclaw commands can authenticate with the gateway
-if [ -n "${OPENCLAW_GATEWAY_TOKEN:-}" ]; then
-    mkdir -p /home/node/.openclaw
-    node -e "
-      const fs = require('fs');
-      const cfgPath = '/home/node/.openclaw/openclaw.json';
-      let cfg = {};
-      try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch {}
-      if (!cfg.gateway) cfg.gateway = {};
-      if (!cfg.gateway.auth) cfg.gateway.auth = {};
-      cfg.gateway.auth.mode = 'token';
-      cfg.gateway.auth.token = process.env.OPENCLAW_GATEWAY_TOKEN;
-      fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
-    "
-    chown -R node:node /home/node/.openclaw
-    echo "CLI auth config written."
-fi
 
 echo "Starting OpenClaw gateway..."
 exec gosu node openclaw gateway --allow-unconfigured --bind lan --port "${PORT:-18789}"
