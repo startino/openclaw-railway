@@ -100,30 +100,24 @@ fi
 # Drop to node user, start OpenClaw gateway
 export HOME="/home/node"
 export OPENCLAW_HOME="$OPENCLAW_HOME"
-GW_PORT="${PORT:-18789}"
 
-# Start gateway in background for auto-pairing
+# Write CLI auth config so exec'd openclaw commands can authenticate with the gateway
+if [ -n "${OPENCLAW_GATEWAY_TOKEN:-}" ]; then
+    mkdir -p /home/node/.openclaw
+    node -e "
+      const fs = require('fs');
+      const cfgPath = '/home/node/.openclaw/openclaw.json';
+      let cfg = {};
+      try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch {}
+      if (!cfg.gateway) cfg.gateway = {};
+      if (!cfg.gateway.auth) cfg.gateway.auth = {};
+      cfg.gateway.auth.mode = 'token';
+      cfg.gateway.auth.token = process.env.OPENCLAW_GATEWAY_TOKEN;
+      fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
+    "
+    chown -R node:node /home/node/.openclaw
+    echo "CLI auth config written."
+fi
+
 echo "Starting OpenClaw gateway..."
-gosu node openclaw gateway --allow-unconfigured --bind lan --port "$GW_PORT" &
-GW_PID=$!
-
-# Auto-pair the local CLI with the gateway (headless bootstrap)
-echo "Waiting for gateway to accept connections..."
-for i in $(seq 1 30); do
-    if curl -sf http://127.0.0.1:$GW_PORT/healthz >/dev/null 2>&1; then
-        echo "Gateway ready, auto-pairing CLI..."
-        # Trigger a pairing request from node user, then approve it
-        gosu node openclaw devices list 2>/dev/null &
-        PAIR_PID=$!
-        sleep 2
-        # Approve the latest pending request
-        OPENCLAW_GATEWAY_TOKEN="${OPENCLAW_GATEWAY_TOKEN}" gosu node openclaw devices approve --latest 2>/dev/null && echo "CLI auto-paired." || echo "Auto-pair skipped (already paired or no pending request)."
-        kill $PAIR_PID 2>/dev/null || true
-        wait $PAIR_PID 2>/dev/null || true
-        break
-    fi
-    sleep 1
-done
-
-# Wait on gateway process (it's now PID 1's child)
-wait $GW_PID
+exec gosu node openclaw gateway --allow-unconfigured --bind lan --port "${PORT:-18789}"
