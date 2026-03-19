@@ -63,8 +63,16 @@ node -e "
 
   // Browser: headless Chromium for container environment
   if (!c.browser) c.browser = {};
-  if (!c.browser.headless) c.browser.headless = true;
-  if (!c.browser.noSandbox) c.browser.noSandbox = true;
+  c.browser.enabled = true;
+  c.browser.headless = true;
+  c.browser.noSandbox = true;
+  // Point to Playwright-installed Chromium (auto-detection won't find /opt/pw-browsers)
+  const fs2 = require('fs');
+  const pwDir = '/opt/pw-browsers';
+  try {
+    const chromDir = fs2.readdirSync(pwDir).find(d => d.startsWith('chromium-'));
+    if (chromDir) c.browser.executablePath = pwDir + '/' + chromDir + '/chrome-linux64/chrome';
+  } catch {};
 
   // Sanitize: remove keys that cause schema validation failures
   if (c.cron && c.cron.jobs) delete c.cron.jobs;
