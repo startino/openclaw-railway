@@ -61,6 +61,11 @@ node -e "
   const origins = process.env.OPENCLAW_ALLOWED_ORIGINS;
   if (origins) c.gateway.controlUi.allowedOrigins = origins.split(',').map(s => s.trim());
 
+  // Browser: headless Chromium for container environment
+  if (!c.browser) c.browser = {};
+  if (!c.browser.headless) c.browser.headless = true;
+  if (!c.browser.noSandbox) c.browser.noSandbox = true;
+
   // Sanitize: remove keys that cause schema validation failures
   if (c.cron && c.cron.jobs) delete c.cron.jobs;
   // Ensure cron is properly enabled (not just empty object)

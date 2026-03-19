@@ -8,8 +8,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN npm install -g openclaw
 
-# Install Playwright Chromium with all system deps (runs as root)
-RUN npx playwright install --with-deps chromium
+# Install Chromium via OpenClaw's bundled Playwright CLI (not npx - avoids npm override conflicts)
+RUN node /usr/local/lib/node_modules/openclaw/node_modules/playwright-core/cli.js install --with-deps chromium
 
 EXPOSE 18789
 
