@@ -49,8 +49,13 @@ node -e "
   if (!c.gateway) c.gateway = {};
   if (!c.gateway.controlUi) c.gateway.controlUi = {};
 
-  // Auth: none (Tailscale is the security boundary)
-  c.gateway.auth = { mode: 'none' };
+  // Auth: token mode with dangerouslyDisableDeviceAuth for CLI access
+  if (!c.gateway.auth) c.gateway.auth = {};
+  c.gateway.auth.mode = 'token';
+  const token = process.env.OPENCLAW_GATEWAY_TOKEN;
+  if (token) c.gateway.auth.token = token;
+  // Disable device pairing for both Control UI and CLI
+  c.gateway.controlUi.dangerouslyDisableDeviceAuth = true;
 
   // Sync allowed origins
   const origins = process.env.OPENCLAW_ALLOWED_ORIGINS;
@@ -100,4 +105,4 @@ export HOME="/home/node"
 export OPENCLAW_HOME="$OPENCLAW_HOME"
 
 echo "Starting OpenClaw gateway..."
-exec gosu node openclaw gateway --allow-unconfigured --bind lan --port "${PORT:-18789}"
+exec gosu node openclaw gateway --allow-unconfigured --bind lan --port "${PORT:-18789}" --token "${OPENCLAW_GATEWAY_TOKEN}"
