@@ -9,7 +9,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN npm install -g openclaw
 
 # Install Chromium via OpenClaw's bundled Playwright CLI (not npx - avoids npm override conflicts)
-RUN node /usr/local/lib/node_modules/openclaw/node_modules/playwright-core/cli.js install --with-deps chromium
+# Install to shared path accessible by both root and node user
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers
+RUN node /usr/local/lib/node_modules/openclaw/node_modules/playwright-core/cli.js install --with-deps chromium && \
+    chmod -R o+rx /opt/pw-browsers
 
 EXPOSE 18789
 
