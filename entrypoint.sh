@@ -113,9 +113,28 @@ if [ -d "$WORKSPACE" ] && [ ! -f "$WORKSPACE/.gitignore" ]; then
     chown node:node "$WORKSPACE/.gitignore"
 fi
 
-# Drop to node user, start OpenClaw gateway
+# Drop to node user, start OpenClaw gateway with restart loop
+# The gateway sends itself SIGUSR1 on config changes, which forks a new
+# process and exits the old one. With exec, that kills PID 1 and the
+# container dies. This loop acts as a lightweight supervisor.
 export HOME="/home/node"
 export OPENCLAW_HOME="$OPENCLAW_HOME"
 
-echo "Starting OpenClaw gateway..."
-exec gosu node openclaw gateway --allow-unconfigured --bind lan --port "${PORT:-18789}" --token "${OPENCLAW_GATEWAY_TOKEN}"
+CONSECUTIVE_FAST_EXITS=0
+while true; do
+    echo "Starting OpenClaw gateway..."
+    START_TIME=$(date +%s)
+    gosu node openclaw gateway --allow-unconfigured --bind lan --port "${PORT:-18789}" --token "${OPENCLAW_GATEWAY_TOKEN}" || true
+    ELAPSED=$(( $(date +%s) - START_TIME ))
+    if [ "$ELAPSED" -lt 5 ]; then
+        CONSECUTIVE_FAST_EXITS=$((CONSECUTIVE_FAST_EXITS + 1))
+        if [ "$CONSECUTIVE_FAST_EXITS" -ge 3 ]; then
+            echo "Gateway crashed 3 times within 5s each. Exiting."
+            exit 1
+        fi
+    else
+        CONSECUTIVE_FAST_EXITS=0
+    fi
+    echo "Gateway exited after ${ELAPSED}s, restarting in 2s..."
+    sleep 2
+done
